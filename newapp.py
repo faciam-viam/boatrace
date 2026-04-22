@@ -93,7 +93,7 @@ st.markdown("""
 # --- データの読み込み ---
 @st.cache_data
 def load_data():
-    file_path = ""race_today.csv""
+    file_path = "race_today.csv"
     
     if not os.path.exists(file_path):
         return pd.DataFrame()
