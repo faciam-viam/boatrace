@@ -1,11 +1,10 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-import requests
-from io import StringIO
+import os
 
 # 画面設定
-st.set_page_config(layout="wide", page_title="Boat Race Data")
+st.set_page_config(layout="wide", page_title="Boat Race Data Analysis")
 
 # ── 視覚性向上のためのカスタムCSS ──
 st.markdown("""
@@ -53,7 +52,6 @@ st.markdown("""
         border: 1px solid #2a3349 !important;
     }
 
-    /* 選手カード専用スタイル */
     .player-card {
         background: #1a1f2e;
         border: 1px solid #2a3349;
@@ -93,24 +91,26 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- データの読み込み ---
-@st.cache_data(ttl=300)  # 5分間キャッシュ
+@st.cache_data
 def load_data():
-    # Zoho SheetのURL
-    csv_url = "https://sheet.zohopublic.jp/sheet/published/xu9ij82cbe57fe37c4ff19b22b13ac92200f1?download=csv&sheetname=本日のレース"
+    file_path = "本日のレース.csv"
     
-    # データ取得
-    response = requests.get(csv_url)
-    
-    if response.status_code == 200:
-        df = pd.read_csv(StringIO(response.text))
-    else:
-        st.error(f"データ取得エラー: {response.status_code}")
+    if not os.path.exists(file_path):
         return pd.DataFrame()
+
+    try:
+        df = pd.read_csv(file_path, encoding="utf-8")
+    except:
+        df = pd.read_csv(file_path, encoding="shift-jis")
     
     df.columns = df.columns.str.strip().str.replace('‐', '-').str.replace('−', '-')
-    df['レース場'] = df['レース場'].astype(str)
-    df['レース回'] = df['レース回'].astype(str)
-    df['枠番'] = df['枠番'].astype(str)
+    
+    if 'レース場' in df.columns:
+        df['レース場'] = df['レース場'].astype(str)
+    if 'レース回' in df.columns:
+        df['レース回'] = df['レース回'].astype(str)
+    if '枠番' in df.columns:
+        df['枠番'] = df['枠番'].astype(str)
     
     str_cols = ['activepoint', 'M総合評価', '支部', '級別', 'FL', '出足', '伸び足']
     for col in str_cols:
@@ -128,7 +128,7 @@ def load_data():
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     return df
 
-# --- ドットプロット形式のグラフ関数（ST・順位共通） ---
+# --- ドットプロット形式のグラフ関数 ---
 def create_rank_dot_fig(data, column_name, title_text, is_st=False):
     fig = go.Figure()
     colors = ["#FFFFFF", "#000000", "#FF3333", "#3333FF", "#FFCC00", "#00AA00"]
@@ -139,11 +139,7 @@ def create_rank_dot_fig(data, column_name, title_text, is_st=False):
         x=display_df['枠番'],
         y=display_df[column_name],
         mode="markers+text+lines",
-        marker=dict(
-            size=18,
-            color=colors,
-            line=dict(width=2, color="white")
-        ),
+        marker=dict(size=18, color=colors, line=dict(width=2, color="white")),
         text=display_df[column_name].apply(lambda x: f"<b>{x:.2f}</b>" if is_st else f"<b>{x:.1f}</b>"),
         textposition="top center",
         cliponaxis=False,
@@ -166,7 +162,7 @@ def create_rank_dot_fig(data, column_name, title_text, is_st=False):
     )
     return fig
 
-# --- 率専用棒グラフ関数（トップ率・最下位率） ---
+# --- 率専用棒グラフ関数 ---
 def create_rate_bar_fig(data, column_name, title_text):
     display_df = data.sort_values('w_num')
     vals = display_df[column_name].apply(lambda x: x * 100 if x <= 1.0 else x)
@@ -192,6 +188,7 @@ def create_rate_bar_fig(data, column_name, title_text):
     )
     return fig
 
+# --- レース詳細レンダリング ---
 def render_race(race_data, selected_venue, selected_race, key_prefix=""):
     if not race_data.empty:
         st.markdown(f'<div class="main-title"><h1>{selected_venue} {selected_race} データ</h1></div>', unsafe_allow_html=True)
@@ -293,33 +290,34 @@ def render_race(race_data, selected_venue, selected_race, key_prefix=""):
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=20, r=40, t=60, b=60))
             st.plotly_chart(fig_kimari, use_container_width=True, key=f"{key_prefix}_kimari")
 
+# --- メインロジック ---
 try:
     df = load_data()
     
-    # データ更新ボタン
-    if st.sidebar.button("データを更新"):
-        st.cache_data.clear()
-        st.rerun()
-    
-    venues = sorted(df['レース場'].unique())
-    selected_venue = st.sidebar.selectbox("レース場", venues)
-    venue_df = df[df['レース場'] == selected_venue]
-    selected_race = st.sidebar.selectbox("レース番号", sorted(venue_df['レース回'].unique()))
-
-    race_data = venue_df[venue_df['レース回'] == selected_race].copy()
-    race_data['w_num'] = pd.to_numeric(race_data['枠番'], errors='coerce')
-    race_data = race_data.sort_values('w_num')
-
-    show_all = st.sidebar.button("全レース一覧")
-
-    if show_all:
-        for race_num in sorted(venue_df['レース回'].unique()):
-            rd = venue_df[venue_df['レース回'] == race_num].copy()
-            rd['w_num'] = pd.to_numeric(rd['枠番'], errors='coerce')
-            rd = rd.sort_values('w_num')
-            render_race(rd, selected_venue, race_num, key_prefix=f"all_{race_num}")
-            st.markdown("---")
+    if df.empty:
+        st.warning("📊 '本日のレース.csv' が見つかりません。")
+        st.info("リポジトリのルートディレクトリにCSVファイルを配置してください。")
     else:
-        render_race(race_data, selected_venue, selected_race, key_prefix="single")
+        venues = sorted(df['レース場'].unique())
+        selected_venue = st.sidebar.selectbox("レース場", venues)
+        venue_df = df[df['レース場'] == selected_venue]
+        selected_race = st.sidebar.selectbox("レース番号", sorted(venue_df['レース回'].unique()))
+
+        race_data = venue_df[venue_df['レース回'] == selected_race].copy()
+        race_data['w_num'] = pd.to_numeric(race_data['枠番'], errors='coerce')
+        race_data = race_data.sort_values('w_num')
+
+        show_all = st.sidebar.button("全レース一覧")
+
+        if show_all:
+            for race_num in sorted(venue_df['レース回'].unique()):
+                rd = venue_df[venue_df['レース回'] == race_num].copy()
+                rd['w_num'] = pd.to_numeric(rd['枠番'], errors='coerce')
+                rd = rd.sort_values('w_num')
+                render_race(rd, selected_venue, race_num, key_prefix=f"all_{race_num}")
+                st.markdown("---")
+        else:
+            render_race(race_data, selected_venue, selected_race, key_prefix="single")
+            
 except Exception as e:
     st.error(f"システムエラーが発生しました: {e}")
