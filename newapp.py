@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-import os
 
 # 画面設定
 st.set_page_config(layout="wide", page_title="Boat Race Data Analysis")
@@ -95,13 +94,15 @@ st.markdown("""
 def load_data():
     file_path = "race_today.csv"
     
-    if not os.path.exists(file_path):
-        return pd.DataFrame()
-
     try:
         df = pd.read_csv(file_path, encoding="utf-8")
-    except:
+    except UnicodeDecodeError:
         df = pd.read_csv(file_path, encoding="shift-jis")
+    except FileNotFoundError:
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"CSVファイル読み込みエラー: {e}")
+        return pd.DataFrame()
     
     df.columns = df.columns.str.strip().str.replace('‐', '-').str.replace('−', '-')
     
