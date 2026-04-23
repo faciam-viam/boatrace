@@ -106,27 +106,30 @@ def load_data():
     
     df.columns = df.columns.str.strip().str.replace('‐', '-').str.replace('−', '-')
     
+    # 文字列型に変換
     if 'レース場' in df.columns:
-        df['レース場'] = df['レース場'].astype(str)
+        df['レース場'] = df['レース場'].astype(str).str.strip()
     if 'レース回' in df.columns:
-        df['レース回'] = df['レース回'].astype(str)
+        df['レース回'] = df['レース回'].astype(str).str.strip()
     if '枠番' in df.columns:
-        df['枠番'] = df['枠番'].astype(str)
+        df['枠番'] = df['枠番'].astype(str).str.strip()
     
-    str_cols = ['activepoint', 'M総合評価', '支部', '級別', 'FL', '出足', '伸び足']
+    str_cols = ['activepoint', 'M総合評価', '支部', '級別', 'FL', '出足', '伸び足', '選手名']
     for col in str_cols:
         if col in df.columns:
-            df[col] = df[col].astype(str).replace('nan', '')
+            df[col] = df[col].astype(str).replace('nan', '').str.strip()
 
     numeric_cols = [
         'コース平均st', '今節平均st', 'コース平均st順位', '今節平均st順位', 
         '全国勝率', '当地勝率', '1着率', '2着率', '3着率', '1-2率', '1-3率', 'M指数', 
         '差し率', 'まくり率', 'まくり差し率',
-        'コースstトップ率', 'コースst最下位率'
+        'コースstトップ率', 'コースst最下位率',
+        '差し数', 'まくり数', 'まくり差し数'
     ]
     for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+    
     return df
 
 # --- ドットプロット形式のグラフ関数 ---
@@ -134,7 +137,7 @@ def create_rank_dot_fig(data, column_name, title_text, is_st=False):
     fig = go.Figure()
     colors = ["#FFFFFF", "#000000", "#FF3333", "#3333FF", "#FFCC00", "#00AA00"]
     
-    display_df = data.sort_values('w_num')
+    display_df = data.sort_values('w_num').reset_index(drop=True)
     
     fig.add_trace(go.Scatter(
         x=display_df['枠番'],
@@ -165,7 +168,7 @@ def create_rank_dot_fig(data, column_name, title_text, is_st=False):
 
 # --- 率専用棒グラフ関数 ---
 def create_rate_bar_fig(data, column_name, title_text):
-    display_df = data.sort_values('w_num')
+    display_df = data.sort_values('w_num').reset_index(drop=True)
     vals = display_df[column_name].apply(lambda x: x * 100 if x <= 1.0 else x)
 
     fig = go.Figure()
@@ -235,7 +238,7 @@ def render_race(race_data, selected_venue, selected_race, key_prefix=""):
                         <div class="pc-item"><span class="pc-label">FL</span>{fl_display}</div>
                         <div class="pc-item"><span class="pc-label">全国勝率</span><span class="pc-val val-large">{r['全国勝率']:.2f}</span></div>
                         <div class="pc-item"><span class="pc-label">当地勝率</span><span class="pc-val val-large">{r['当地勝率']:.2f}</span></div>
-                        <div class="pc-item"><span class="pc-label">M指数</span><span class="pc-val">{r['M指数']}</span></div>
+                        <div class="pc-item"><span class="pc-label">M指数</span><span class="pc-val">{r['M指数']:.0f}</span></div>
                         <div class="pc-item"><span class="pc-label">point</span><span class="pc-val">{r['activepoint']}</span></div>
                         <div class="pc-item"><span class="pc-label">評価</span><span class="pc-val">{r['M総合評価']}</span></div>
                         <div class="pc-item"><span class="pc-label">出足</span><span class="pc-val">{r['出足']}</span></div>
@@ -302,19 +305,22 @@ try:
         venues = sorted(df['レース場'].unique())
         selected_venue = st.sidebar.selectbox("レース場", venues)
         venue_df = df[df['レース場'] == selected_venue]
-        selected_race = st.sidebar.selectbox("レース番号", sorted(venue_df['レース回'].unique()))
+        
+        # レース回を文字列としてソート
+        race_numbers = sorted(venue_df['レース回'].unique(), key=lambda x: int(x) if x.isdigit() else 0)
+        selected_race = st.sidebar.selectbox("レース番号", race_numbers)
 
         race_data = venue_df[venue_df['レース回'] == selected_race].copy()
-        race_data['w_num'] = pd.to_numeric(race_data['枠番'], errors='coerce')
-        race_data = race_data.sort_values('w_num')
+        race_data['w_num'] = pd.to_numeric(race_data['枠番'], errors='coerce').fillna(0)
+        race_data = race_data.sort_values('w_num').reset_index(drop=True)
 
         show_all = st.sidebar.button("全レース一覧")
 
         if show_all:
-            for race_num in sorted(venue_df['レース回'].unique()):
+            for race_num in race_numbers:
                 rd = venue_df[venue_df['レース回'] == race_num].copy()
-                rd['w_num'] = pd.to_numeric(rd['枠番'], errors='coerce')
-                rd = rd.sort_values('w_num')
+                rd['w_num'] = pd.to_numeric(rd['枠番'], errors='coerce').fillna(0)
+                rd = rd.sort_values('w_num').reset_index(drop=True)
                 render_race(rd, selected_venue, race_num, key_prefix=f"all_{race_num}")
                 st.markdown("---")
         else:
@@ -322,3 +328,5 @@ try:
             
 except Exception as e:
     st.error(f"システムエラーが発生しました: {e}")
+    import traceback
+    st.error(traceback.format_exc())
