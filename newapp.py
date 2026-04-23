@@ -302,29 +302,39 @@ try:
         st.warning("📊 'race_today.csv' が見つかりません。")
         st.info("リポジトリのルートディレクトリにCSVファイルを配置してください。")
     else:
-        venues = sorted(df['レース場'].unique())
-        selected_venue = st.sidebar.selectbox("レース場", venues)
-        venue_df = df[df['レース場'] == selected_venue]
+        # NaNを除外してソート
+        venues = sorted([v for v in df['レース場'].unique() if pd.notna(v) and str(v) != 'nan'])
         
-        # レース回を文字列としてソート
-        race_numbers = sorted(venue_df['レース回'].unique(), key=lambda x: int(x) if x.isdigit() else 0)
-        selected_race = st.sidebar.selectbox("レース番号", race_numbers)
-
-        race_data = venue_df[venue_df['レース回'] == selected_race].copy()
-        race_data['w_num'] = pd.to_numeric(race_data['枠番'], errors='coerce').fillna(0)
-        race_data = race_data.sort_values('w_num').reset_index(drop=True)
-
-        show_all = st.sidebar.button("全レース一覧")
-
-        if show_all:
-            for race_num in race_numbers:
-                rd = venue_df[venue_df['レース回'] == race_num].copy()
-                rd['w_num'] = pd.to_numeric(rd['枠番'], errors='coerce').fillna(0)
-                rd = rd.sort_values('w_num').reset_index(drop=True)
-                render_race(rd, selected_venue, race_num, key_prefix=f"all_{race_num}")
-                st.markdown("---")
+        if not venues:
+            st.error("レース場データが見つかりません。")
         else:
-            render_race(race_data, selected_venue, selected_race, key_prefix="single")
+            selected_venue = st.sidebar.selectbox("レース場", venues)
+            venue_df = df[df['レース場'] == selected_venue]
+            
+            # レース回を文字列としてソート
+            race_numbers = sorted([r for r in venue_df['レース回'].unique() if pd.notna(r) and str(r) != 'nan'], 
+                                key=lambda x: int(x) if str(x).isdigit() else 0)
+            
+            if not race_numbers:
+                st.error("レース番号データが見つかりません。")
+            else:
+                selected_race = st.sidebar.selectbox("レース番号", race_numbers)
+
+                race_data = venue_df[venue_df['レース回'] == selected_race].copy()
+                race_data['w_num'] = pd.to_numeric(race_data['枠番'], errors='coerce').fillna(0)
+                race_data = race_data.sort_values('w_num').reset_index(drop=True)
+
+                show_all = st.sidebar.button("全レース一覧")
+
+                if show_all:
+                    for race_num in race_numbers:
+                        rd = venue_df[venue_df['レース回'] == race_num].copy()
+                        rd['w_num'] = pd.to_numeric(rd['枠番'], errors='coerce').fillna(0)
+                        rd = rd.sort_values('w_num').reset_index(drop=True)
+                        render_race(rd, selected_venue, race_num, key_prefix=f"all_{race_num}")
+                        st.markdown("---")
+                else:
+                    render_race(race_data, selected_venue, selected_race, key_prefix="single")
             
 except Exception as e:
     st.error(f"システムエラーが発生しました: {e}")
