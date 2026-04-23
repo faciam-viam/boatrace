@@ -295,7 +295,7 @@ try:
     df = load_data()
     
     if df.empty:
-        st.warning("📊 '本日のレース.csv' が見つかりません。")
+        st.warning("📊 'race_today.csv' が見つかりません。")
         st.info("リポジトリのルートディレクトリにCSVファイルを配置してください。")
     else:
         venues = sorted(df['レース場'].unique())
