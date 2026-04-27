@@ -201,7 +201,20 @@ def create_rate_bar_fig(data, column_name, title_text):
 # --- レース詳細レンダリング ---
 def render_race(race_data, selected_venue, selected_race, key_prefix=""):
     if not race_data.empty:
-        st.markdown(f'<div class="main-title"><h1>{selected_venue} {selected_race} データ</h1></div>', unsafe_allow_html=True)
+        # レース時間を取得
+        race_time = ""
+        if '締切予定時刻' in race_data.columns and not race_data.empty:
+            time_value = race_data.iloc[0]['締切予定時刻']
+            try:
+                # 小数を時刻に変換 (0.736805556 → 17:41)
+                time_float = float(time_value)
+                hours = int(time_float * 24)
+                minutes = int((time_float * 24 - hours) * 60)
+                race_time = f" - {hours:02d}:{minutes:02d}締切予定"
+            except:
+                race_time = ""
+        
+        st.markdown(f'<div class="main-title"><h1>{selected_venue} {selected_race} データ{race_time}</h1></div>', unsafe_allow_html=True)
         
         m_col1, m_col2, m_col3 = st.columns([1.5, 1, 1])
         p1_data = race_data[race_data['枠番'] == '1.0'].head(1)
