@@ -120,17 +120,17 @@ def load_data():
     if '枠番' in df.columns:
         df['枠番'] = df['枠番'].astype(str).str.strip()
     
-    # 文字列カラムの処理を強化
+    # 文字列カラムの処理を強化（float型のNaNにも対応）
     str_cols = ['activepoint', 'M総合評価', '支部', '級別', 'FL', '出足', '伸び足', '選手名']
     for col in str_cols:
         if col in df.columns:
-            # まず文字列に変換
+            # NaNをまず空文字に変換してから文字列処理
+            df[col] = df[col].fillna('')
             df[col] = df[col].astype(str)
             # 'nan', 'NaN', 'None', '', '-' を全て '-' に統一
-            df[col] = df[col].replace(['nan', 'NaN', 'None', '', ' '], '-')
-            df[col] = df[col].str.strip()
-            # 空白だけの場合も '-' に
-            df[col] = df[col].apply(lambda x: '-' if x.strip() == '' else x)
+            df[col] = df[col].replace(['nan', 'NaN', 'None', ''], '-')
+            # strip処理（空白除去）
+            df[col] = df[col].apply(lambda x: '-' if (isinstance(x, str) and x.strip() in ['', '-']) else (x if isinstance(x, str) else '-'))
 
     numeric_cols = [
         'コース平均st', '今節平均st', 'コース平均st順位', '今節平均st順位', 
@@ -256,7 +256,9 @@ def render_race(race_data, selected_venue, selected_race, key_prefix=""):
             w_cls = f"waku-{r['枠番']}"
             
             # 各フィールドの表示処理を統一
-            def safe_display(value, is_fl=False):
+            def safe_display(value):
+                if pd.isna(value):
+                    return "-"
                 str_val = str(value).strip()
                 if str_val in ['', '-', 'nan', 'NaN', 'None']:
                     return "-"
