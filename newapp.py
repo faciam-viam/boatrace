@@ -120,10 +120,17 @@ def load_data():
     if '枠番' in df.columns:
         df['枠番'] = df['枠番'].astype(str).str.strip()
     
+    # 文字列カラムの処理を強化（float型のNaNにも対応）
     str_cols = ['activepoint', 'M総合評価', '支部', '級別', 'FL', '出足', '伸び足', '選手名']
     for col in str_cols:
         if col in df.columns:
-            df[col] = df[col].astype(str).replace('nan', '').str.strip()
+            # NaNをまず空文字に変換してから文字列処理
+            df[col] = df[col].fillna('')
+            df[col] = df[col].astype(str)
+            # 'nan', 'NaN', 'None', '', '-' を全て '-' に統一
+            df[col] = df[col].replace(['nan', 'NaN', 'None', ''], '-')
+            # strip処理（空白除去）
+            df[col] = df[col].apply(lambda x: '-' if (isinstance(x, str) and x.strip() in ['', '-']) else (x if isinstance(x, str) else '-'))
 
     numeric_cols = [
         'コース平均st', '今節平均st', 'コース平均st順位', '今節平均st順位', 
@@ -247,22 +254,34 @@ def render_race(race_data, selected_venue, selected_race, key_prefix=""):
         st.markdown('<div class="section-header">選手データ</div>', unsafe_allow_html=True)
         for _, r in race_data.iterrows():
             w_cls = f"waku-{r['枠番']}"
-            fl_display = f"<span class='val-fl'>{r['FL']}</span>" if r['FL'] != "" else "<span class='pc-val'>-</span>"
+            
+            # 各フィールドの表示処理を統一
+            def safe_display(value):
+                if pd.isna(value):
+                    return "-"
+                str_val = str(value).strip()
+                if str_val in ['', '-', 'nan', 'NaN', 'None']:
+                    return "-"
+                return str_val
+            
+            fl_val = safe_display(r['FL'])
+            fl_display = f"<span class='val-fl'>{fl_val}</span>" if fl_val != "-" else "<span class='pc-val'>-</span>"
+            
             st.markdown(f"""
                 <div class="player-card {w_cls}">
                     <div class="pc-waku">{int(float(r['枠番']))}</div>
                     <div class="pc-name-area"><div class="pc-name">{r['選手名']}</div></div>
                     <div class="pc-stats-grid">
-                        <div class="pc-item"><span class="pc-label">級別</span><span class="pc-val val-large">{r['級別']}</span></div>
-                        <div class="pc-item"><span class="pc-label">支部</span><span class="pc-val val-small">{r['支部']}</span></div>
+                        <div class="pc-item"><span class="pc-label">級別</span><span class="pc-val val-large">{safe_display(r['級別'])}</span></div>
+                        <div class="pc-item"><span class="pc-label">支部</span><span class="pc-val val-small">{safe_display(r['支部'])}</span></div>
                         <div class="pc-item"><span class="pc-label">FL</span>{fl_display}</div>
                         <div class="pc-item"><span class="pc-label">全国勝率</span><span class="pc-val val-large">{r['全国勝率']:.2f}</span></div>
                         <div class="pc-item"><span class="pc-label">当地勝率</span><span class="pc-val val-large">{r['当地勝率']:.2f}</span></div>
                         <div class="pc-item"><span class="pc-label">M指数</span><span class="pc-val">{r['M指数']:.0f}</span></div>
-                        <div class="pc-item"><span class="pc-label">point</span><span class="pc-val">{r['activepoint']}</span></div>
-                        <div class="pc-item"><span class="pc-label">評価</span><span class="pc-val">{r['M総合評価']}</span></div>
-                        <div class="pc-item"><span class="pc-label">出足</span><span class="pc-val">{r['出足']}</span></div>
-                        <div class="pc-item"><span class="pc-label">伸び足</span><span class="pc-val">{r['伸び足']}</span></div>
+                        <div class="pc-item"><span class="pc-label">point</span><span class="pc-val">{safe_display(r['activepoint'])}</span></div>
+                        <div class="pc-item"><span class="pc-label">評価</span><span class="pc-val">{safe_display(r['M総合評価'])}</span></div>
+                        <div class="pc-item"><span class="pc-label">出足</span><span class="pc-val">{safe_display(r['出足'])}</span></div>
+                        <div class="pc-item"><span class="pc-label">伸び足</span><span class="pc-val">{safe_display(r['伸び足'])}</span></div>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
