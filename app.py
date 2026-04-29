@@ -121,7 +121,7 @@ def load_data():
         df['枠番'] = df['枠番'].astype(str).str.strip()
     
     # 文字列カラムの処理を強化（float型のNaNにも対応）
-    str_cols = ['activepoint', 'M総合評価', '支部', '級別', 'FL', '出足', '伸び足', '選手名']
+    str_cols = ['支部', '級別', 'FL', '選手名']
     for col in str_cols:
         if col in df.columns:
             # NaNをまず空文字に変換してから文字列処理
@@ -134,7 +134,7 @@ def load_data():
 
     numeric_cols = [
         'コース平均st', '今節平均st', 'コース平均st順位', '今節平均st順位', 
-        '全国勝率', '当地勝率', '1着率', '2着率', '3着率', '1-2率', '1-3率', 'M指数', 
+        '全国勝率', '当地勝率', '1着率', '2着率', '3着率', '1-2率', '1-3率',
         '差し率', 'まくり率', 'まくり差し率',
         'コースstトップ率', 'コースst最下位率',
         '差し数', 'まくり数', 'まくり差し数'
@@ -142,6 +142,10 @@ def load_data():
     for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+    
+    # 締切予定時刻は文字列として保持
+    if '締切予定時刻' in df.columns:
+        df['締切予定時刻'] = df['締切予定時刻'].astype(str).replace('nan', '')
     
     return df
 
@@ -211,15 +215,9 @@ def render_race(race_data, selected_venue, selected_race, key_prefix=""):
         # レース時間を取得
         race_time = ""
         if '締切予定時刻' in race_data.columns and not race_data.empty:
-            time_value = race_data.iloc[0]['締切予定時刻']
-            try:
-                # 小数を時刻に変換 (0.736805556 → 17:41)
-                time_float = float(time_value)
-                hours = int(time_float * 24)
-                minutes = int((time_float * 24 - hours) * 60)
-                race_time = f" - {hours:02d}:{minutes:02d}締切予定"
-            except:
-                race_time = ""
+            time_value = str(race_data.iloc[0]['締切予定時刻']).strip()
+            if time_value and time_value not in ['', 'nan', 'NaN', '-']:
+                race_time = f" - {time_value}締切予定"
         
         st.markdown(f'<div class="main-title"><h1>{selected_venue} {selected_race} データ{race_time}</h1></div>', unsafe_allow_html=True)
         
@@ -277,11 +275,6 @@ def render_race(race_data, selected_venue, selected_race, key_prefix=""):
                         <div class="pc-item"><span class="pc-label">FL</span>{fl_display}</div>
                         <div class="pc-item"><span class="pc-label">全国勝率</span><span class="pc-val val-large">{r['全国勝率']:.2f}</span></div>
                         <div class="pc-item"><span class="pc-label">当地勝率</span><span class="pc-val val-large">{r['当地勝率']:.2f}</span></div>
-                        <div class="pc-item"><span class="pc-label">M指数</span><span class="pc-val">{r['M指数']:.0f}</span></div>
-                        <div class="pc-item"><span class="pc-label">point</span><span class="pc-val">{safe_display(r['activepoint'])}</span></div>
-                        <div class="pc-item"><span class="pc-label">評価</span><span class="pc-val">{safe_display(r['M総合評価'])}</span></div>
-                        <div class="pc-item"><span class="pc-label">出足</span><span class="pc-val">{safe_display(r['出足'])}</span></div>
-                        <div class="pc-item"><span class="pc-label">伸び足</span><span class="pc-val">{safe_display(r['伸び足'])}</span></div>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
