@@ -143,6 +143,10 @@ def load_data():
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     
+    # 締切予定時刻は文字列として保持
+    if '締切予定時刻' in df.columns:
+        df['締切予定時刻'] = df['締切予定時刻'].astype(str).replace('nan', '')
+    
     return df
 
 # --- ドットプロット形式のグラフ関数 ---
@@ -211,15 +215,9 @@ def render_race(race_data, selected_venue, selected_race, key_prefix=""):
         # レース時間を取得
         race_time = ""
         if '締切予定時刻' in race_data.columns and not race_data.empty:
-            time_value = race_data.iloc[0]['締切予定時刻']
-            try:
-                # 小数を時刻に変換 (0.736805556 → 17:41)
-                time_float = float(time_value)
-                hours = int(time_float * 24)
-                minutes = int((time_float * 24 - hours) * 60)
-                race_time = f" - {hours:02d}:{minutes:02d}締切予定"
-            except:
-                race_time = ""
+            time_value = str(race_data.iloc[0]['締切予定時刻']).strip()
+            if time_value and time_value not in ['', 'nan', 'NaN', '-']:
+                race_time = f" - {time_value}締切予定"
         
         st.markdown(f'<div class="main-title"><h1>{selected_venue} {selected_race} データ{race_time}</h1></div>', unsafe_allow_html=True)
         
