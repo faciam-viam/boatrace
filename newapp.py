@@ -328,7 +328,16 @@ def render_race(race_data, selected_venue, selected_race, key_prefix=""):
 
         st.markdown('<div class="section-header">選手データ</div>', unsafe_allow_html=True)
         for _, r in race_data.iterrows():
-            w_cls = f"waku-{r['枠番']}"
+            # 枠番を安全に取得
+            try:
+                waku_num = pd.to_numeric(r['枠番'], errors='coerce')
+                if pd.isna(waku_num):
+                    continue  # 無効な枠番はスキップ
+                waku_display = int(waku_num)
+                w_cls = f"waku-{waku_display}"
+            except:
+                continue  # エラーが発生した場合はスキップ
+            
             def safe_display(value):
                 if pd.isna(value): return "-"
                 str_val = str(value).strip()
@@ -340,7 +349,7 @@ def render_race(race_data, selected_venue, selected_race, key_prefix=""):
             
             st.markdown(f"""
                 <div class="player-card {w_cls}">
-                    <div class="pc-waku">{int(float(r['枠番']))}</div>
+                    <div class="pc-waku">{waku_display}</div>
                     <div class="pc-name-area"><div class="pc-name">{r['選手名']}</div></div>
                     <div class="pc-stats-grid">
                         <div class="pc-item"><span class="pc-label">級別</span><span class="pc-val val-large">{safe_display(r['級別'])}</span></div>
@@ -348,11 +357,6 @@ def render_race(race_data, selected_venue, selected_race, key_prefix=""):
                         <div class="pc-item"><span class="pc-label">FL</span>{fl_display}</div>
                         <div class="pc-item"><span class="pc-label">全国勝率</span><span class="pc-val val-large">{r['全国勝率']:.2f}</span></div>
                         <div class="pc-item"><span class="pc-label">当地勝率</span><span class="pc-val val-large">{r['当地勝率']:.2f}</span></div>
-                        <div class="pc-item"><span class="pc-label">M指数</span><span class="pc-val">{r['M指数']:.0f}</span></div>
-                        <div class="pc-item"><span class="pc-label">point</span><span class="pc-val">{safe_display(r['activepoint'])}</span></div>
-                        <div class="pc-item"><span class="pc-label">評価</span><span class="pc-val">{safe_display(r['M総合評価'])}</span></div>
-                        <div class="pc-item"><span class="pc-label">出足</span><span class="pc-val">{safe_display(r['出足'])}</span></div>
-                        <div class="pc-item"><span class="pc-label">伸び足</span><span class="pc-val">{safe_display(r['伸び足'])}</span></div>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
@@ -407,8 +411,11 @@ def render_race(race_data, selected_venue, selected_race, key_prefix=""):
                     col_name = f'今節成績_{day}-{run}'
                     waku_val = r.get(col_name, '')
                     if pd.notna(waku_val) and str(waku_val).strip() not in ['', '-', 'nan']:
-                        val_str = str(int(float(waku_val)))
-                        html += f'<div class="ks-cell"><div class="ks-waku waku-bg-white">{val_str}</div></div>'
+                        try:
+                            val_str = str(int(float(waku_val)))
+                            html += f'<div class="ks-cell"><div class="ks-waku waku-bg-white">{val_str}</div></div>'
+                        except:
+                            html += '<div class="ks-cell"></div>'
                     else: html += '<div class="ks-cell"></div>'
             html += '</div>'
         html += '</div>'
@@ -421,7 +428,14 @@ def render_race(race_data, selected_venue, selected_race, key_prefix=""):
         t_html += '</div>'
         
         for _, r in race_data.iterrows():
-            c_waku = int(float(r['枠番']))
+            try:
+                c_waku_num = pd.to_numeric(r['枠番'], errors='coerce')
+                if pd.isna(c_waku_num):
+                    continue
+                c_waku = int(c_waku_num)
+            except:
+                continue
+                
             t_html += f'<div class="trend-row"><div class="ks-name">{r["選手名"]}</div>'
             for t_waku in range(1, 7):
                 if c_waku == t_waku:
